@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: Sift
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+  profiles:
+    default: dev
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  servlet:
+    context-path: /
+
+springdoc:
+  api-docs:
+    enabled: true
+
+  swagger-ui:
+    enabled: true
+
+jwt:
+  secret: 7QkLm8PxV2zNc5HrA1sDf9JyUwE4RtBx6MvZ0XcGpFnHsKaQ
+  expiration: 3600000
