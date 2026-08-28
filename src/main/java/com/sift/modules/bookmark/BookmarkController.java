@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -15,6 +16,13 @@ public class BookmarkController {
 
     public BookmarkController(BookmarkService bookmarkService) {
         this.bookmarkService = bookmarkService;
+    }
+
+    @GetMapping
+    public List<BookmarkResponseDTO> getBookmarks(
+            Authentication authentication
+    ) {
+        return bookmarkService.getBookmarks(authentication);
     }
 
     @PostMapping

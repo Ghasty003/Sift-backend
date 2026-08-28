@@ -1,11 +1,15 @@
 package com.sift.modules.bookmark;
 
 import com.sift.modules.collection.CollectionEntity;
+import com.sift.modules.note.BookmarkNoteEntity;
+import com.sift.modules.tag.TagEntity;
 import com.sift.modules.tweet.TweetEntity;
 import com.sift.modules.user.UserEntity;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -80,6 +84,20 @@ public class BookmarkEntity {
             nullable = false
     )
     private OffsetDateTime updatedAt;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "bookmark_tags",
+            joinColumns = @JoinColumn(name = "bookmark_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private List<TagEntity> tags = new ArrayList<>();
+
+    @OneToOne(
+            mappedBy = "bookmark",
+            fetch = FetchType.LAZY
+    )
+    private BookmarkNoteEntity note;
 
     @PrePersist
     protected void onCreate() {
@@ -156,5 +174,21 @@ public class BookmarkEntity {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public List<TagEntity> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<TagEntity> tags) {
+        this.tags = tags;
+    }
+
+    public BookmarkNoteEntity getNote() {
+        return note;
+    }
+
+    public void setNote(BookmarkNoteEntity note) {
+        this.note = note;
     }
 }
