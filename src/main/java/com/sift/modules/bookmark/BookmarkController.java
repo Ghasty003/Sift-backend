@@ -25,6 +25,20 @@ public class BookmarkController {
         return bookmarkService.getBookmarks(authentication);
     }
 
+    @GetMapping("/collection/{collectionId}")
+    public ResponseEntity<List<BookmarkResponseDTO>> getBookmarksInCollection(
+            Authentication authentication,
+            @PathVariable UUID collectionId
+    ) {
+        return ResponseEntity.ok(
+                bookmarkService.getBookmarksInCollection(
+                        authentication,
+                        collectionId
+                )
+        );
+    }
+
+
     @PostMapping
     public BookmarkResponseDTO createBookmark(
             Authentication authentication,

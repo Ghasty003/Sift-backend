@@ -1,5 +1,6 @@
 package com.sift.modules.bookmark;
 
+import com.sift.modules.collection.CollectionEntity;
 import com.sift.modules.user.UserEntity;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,5 +32,10 @@ public interface BookmarkRepository extends JpaRepository<BookmarkEntity, UUID> 
     })
     List<BookmarkEntity> findAllByUserIdOrderBySavedAtDesc(
             UUID userId
+    );
+
+    List<BookmarkEntity> findAllByUserAndCollectionOrderBySavedAtDesc(
+            UserEntity user,
+            CollectionEntity collection
     );
 }

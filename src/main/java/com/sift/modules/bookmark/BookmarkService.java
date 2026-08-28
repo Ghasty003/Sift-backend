@@ -145,6 +145,133 @@ public class BookmarkService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<BookmarkResponseDTO> getBookmarksInCollection(
+            Authentication authentication,
+            UUID collectionId
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        // Make sure this collection belongs to the authenticated user.
+        CollectionEntity collection =
+                collectionRepository
+                        .findByIdAndUser(collectionId, user)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Collection not found"
+                                )
+                        );
+
+        // Fetch only this user's bookmarks in this collection.
+        List<BookmarkEntity> bookmarks =
+                bookmarkRepository
+                        .findAllByUserAndCollectionOrderBySavedAtDesc(
+                                user,
+                                collection
+                        );
+
+        if (bookmarks.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> bookmarkIds =
+                bookmarks.stream()
+                        .map(BookmarkEntity::getId)
+                        .toList();
+
+        // Fetch all tags in one query.
+        List<BookmarkTagEntity> bookmarkTags =
+                bookmarkTagRepository
+                        .findAllByBookmarkIdIn(bookmarkIds);
+
+        Map<UUID, List<TagResponseDTO>> tagsByBookmark =
+                bookmarkTags.stream()
+                        .collect(Collectors.groupingBy(
+                                BookmarkTagEntity::getBookmarkId,
+                                Collectors.mapping(
+                                        bookmarkTag ->
+                                                new TagResponseDTO(
+                                                        bookmarkTag
+                                                                .getTag()
+                                                                .getId(),
+                                                        bookmarkTag
+                                                                .getTag()
+                                                                .getName()
+                                                ),
+                                        Collectors.toList()
+                                )
+                        ));
+
+        // Fetch all notes in one query.
+        List<BookmarkNoteEntity> notes =
+                bookmarkNoteRepository
+                        .findAllByBookmarkIdIn(bookmarkIds);
+
+        Map<UUID, BookmarkNoteEntity> notesByBookmark =
+                notes.stream()
+                        .collect(Collectors.toMap(
+                                note ->
+                                        note.getBookmark()
+                                                .getId(),
+                                Function.identity()
+                        ));
+
+        return bookmarks.stream()
+                .map(bookmark -> {
+
+                    List<TagResponseDTO> tags =
+                            tagsByBookmark.getOrDefault(
+                                    bookmark.getId(),
+                                    List.of()
+                            );
+
+                    BookmarkNoteEntity note =
+                            notesByBookmark.get(
+                                    bookmark.getId()
+                            );
+
+                    NoteResponseDTO noteResponse =
+                            note == null
+                                    ? null
+                                    : new NoteResponseDTO(
+                                    note.getId(),
+                                    bookmark.getId(),
+                                    note.getContent(),
+                                    note.getCreatedAt(),
+                                    note.getUpdatedAt()
+                            );
+
+                    return new BookmarkResponseDTO(
+                            bookmark.getId(),
+
+                            new TweetResponseDTO(
+                                    bookmark.getTweet().getId(),
+                                    bookmark.getTweet().getUrl(),
+                                    bookmark.getTweet().getAuthorUsername(),
+                                    bookmark.getTweet().getAuthorName(),
+                                    bookmark.getTweet().getText(),
+                                    bookmark.getTweet().getCreatedAt()
+                            ),
+
+                            new CollectionResponseDTO(
+                                    bookmark.getCollection().getId(),
+                                    bookmark.getCollection().getName(),
+                                    bookmark.getCollection().getDescription(),
+                                    bookmark.getCollection().getCreatedAt(),
+                                    bookmark.getCollection().getUpdatedAt()
+                            ),
+
+                            bookmark.isFavorite(),
+                            bookmark.isRead(),
+                            bookmark.getSavedAt(),
+                            tags,
+                            noteResponse
+                    );
+                })
+                .toList();
+    }
+
     @Transactional
     public BookmarkResponseDTO createBookmark(
             Authentication authentication,

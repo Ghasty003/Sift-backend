@@ -5,7 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/collections")
@@ -13,7 +13,9 @@ public class CollectionController {
 
     private final CollectionService collectionService;
 
-    public CollectionController(CollectionService collectionService) {
+    public CollectionController(
+            CollectionService collectionService
+    ) {
         this.collectionService = collectionService;
     }
 
@@ -31,5 +33,14 @@ public class CollectionController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(response);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<CollectionResponseDTO>> getCollections(
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                collectionService.getCollections(authentication)
+        );
     }
 }
