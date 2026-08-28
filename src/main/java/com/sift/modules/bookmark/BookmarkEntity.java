@@ -1,5 +1,6 @@
 package com.sift.modules.bookmark;
 
+import com.sift.modules.collection.CollectionEntity;
 import com.sift.modules.tweet.TweetEntity;
 import com.sift.modules.user.UserEntity;
 import jakarta.persistence.*;

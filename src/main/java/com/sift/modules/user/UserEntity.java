@@ -65,6 +65,10 @@ public class UserEntity implements UserDetails {
         updatedAt = OffsetDateTime.now();
     }
 
+    public UUID getId() {
+        return id;
+    }
+
     public String getEmail() {
         return email;
     }
