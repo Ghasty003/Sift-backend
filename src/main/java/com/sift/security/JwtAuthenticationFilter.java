@@ -45,6 +45,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String jwt = authHeader.substring(7);
 
+        if (jwt.startsWith("sift_")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String username = jwtService.extractUsername(jwt);
 
         if (username != null &&

@@ -1,17 +1,19 @@
 package com.sift.modules.api_token;
 
-
 import com.sift.modules.user.UserEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
+import java.util.Optional;
+
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.nio.charset.StandardCharsets;
-import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.UUID;
 
 @Service
 public class ApiTokenService {
@@ -29,27 +31,36 @@ public class ApiTokenService {
             CreateApiTokenRequestDTO request
     ) {
 
-        UserEntity user = (UserEntity) authentication.getPrincipal();
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
 
-        // Generate random raw token
+        // Generate token ID
+        String tokenId = UUID.randomUUID()
+                .toString()
+                .replace("-", "");
+
+        // Generate random secret
         byte[] randomBytes = new byte[32];
         secureRandom.nextBytes(randomBytes);
 
-        String rawToken =
-                "sift_" + Base64.getUrlEncoder()
-                        .withoutPadding()
-                        .encodeToString(randomBytes);
+        String secret = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(randomBytes);
 
-        // hash this before saving.
-        // We'll use SHA-256 for API tokens.
-        String tokenHash = hashToken(rawToken);
+        // Complete token given to the client
+        String rawToken =
+                "sift_" + tokenId + "_" + secret;
+
+        // Store only the hash of the secret
+        String tokenHash = hashToken(secret);
 
         ApiTokenEntity apiToken = new ApiTokenEntity();
 
         apiToken.setUser(user);
+        apiToken.setTokenId(tokenId);
+        apiToken.setTokenHash(tokenHash);
         apiToken.setType(request.type());
         apiToken.setName(request.name());
-        apiToken.setTokenHash(tokenHash);
 
         apiTokenRepository.save(apiToken);
 
@@ -61,9 +72,53 @@ public class ApiTokenService {
         );
     }
 
+    @Transactional
+    public Optional<UserEntity> authenticateToken(String rawToken) {
+
+        if (rawToken == null || !rawToken.startsWith("sift_")) {
+            return Optional.empty();
+        }
+
+        String[] parts = rawToken.split("_", 3);
+
+        if (parts.length != 3) {
+            return Optional.empty();
+        }
+
+        String tokenId = parts[1];
+        String secret = parts[2];
+
+        Optional<ApiTokenEntity> tokenOptional =
+                apiTokenRepository.findByTokenIdAndRevokedAtIsNull(tokenId);
+
+        if (tokenOptional.isEmpty()) {
+            return Optional.empty();
+        }
+
+        ApiTokenEntity apiToken = tokenOptional.get();
+
+        String providedHash = hashToken(secret);
+
+        boolean valid = MessageDigest.isEqual(
+                providedHash.getBytes(StandardCharsets.UTF_8),
+                apiToken.getTokenHash()
+                        .getBytes(StandardCharsets.UTF_8)
+        );
+
+        if (!valid) {
+            return Optional.empty();
+        }
+
+        apiToken.setLastUsedAt(OffsetDateTime.now());
+
+        return Optional.of(apiToken.getUser());
+    }
+
     private String hashToken(String token) {
+
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest =
+                    MessageDigest.getInstance("SHA-256");
 
             byte[] hash = digest.digest(
                     token.getBytes(StandardCharsets.UTF_8)
@@ -71,8 +126,11 @@ public class ApiTokenService {
 
             return HexFormat.of().formatHex(hash);
 
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    "Unable to hash API token",
+                    e
+            );
         }
     }
 }

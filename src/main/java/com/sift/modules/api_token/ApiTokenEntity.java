@@ -36,7 +36,15 @@ public class ApiTokenEntity {
     @Column(length = 100)
     private String name;
 
-    @Column(name = "token_hash", nullable = false, length = 255)
+    @Column(
+            name = "token_id",
+            nullable = false,
+            unique = true,
+            length = 100
+    )
+    private String tokenId;
+
+    @Column(name = "token_hash", nullable = false)
     private String tokenHash;
 
     @Column(name = "created_at", nullable = false, insertable = false)
@@ -70,6 +78,14 @@ public class ApiTokenEntity {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getTokenId() {
+        return tokenId;
+    }
+
+    public void setTokenId(String tokenId) {
+        this.tokenId = tokenId;
     }
 
     public String getTokenHash() {
