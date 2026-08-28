@@ -1,5 +1,7 @@
 package com.sift.modules.bookmark;
 
+import com.sift.modules.collection.CollectionEntity;
+import com.sift.modules.collection.CollectionRepository;
 import com.sift.modules.tweet.TweetEntity;
 import com.sift.modules.tweet.TweetRepository;
 import com.sift.modules.user.UserEntity;
@@ -7,16 +9,20 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
+
 @Service
 public class BookmarkService {
 
+    private final CollectionRepository collectionRepository;
     private final BookmarkRepository bookmarkRepository;
     private final TweetRepository tweetRepository;
 
     public BookmarkService(
-            BookmarkRepository bookmarkRepository,
+            CollectionRepository collectionRepository, BookmarkRepository bookmarkRepository,
             TweetRepository tweetRepository
     ) {
+        this.collectionRepository = collectionRepository;
         this.bookmarkRepository = bookmarkRepository;
         this.tweetRepository = tweetRepository;
     }
@@ -74,6 +80,30 @@ public class BookmarkService {
         tweet.setCreatedAt(request.createdAt());
 
         return tweetRepository.save(tweet);
+    }
+
+    public void addBookmarkToCollection(
+            Authentication authentication,
+            UUID bookmarkId,
+            UUID collectionId
+    ) {
+        UserEntity user = (UserEntity) authentication.getPrincipal();
+
+        BookmarkEntity bookmark =
+                bookmarkRepository.findByIdAndUser(bookmarkId, user)
+                        .orElseThrow(() ->
+                                new RuntimeException("Bookmark not found")
+                        );
+
+        CollectionEntity collection =
+                collectionRepository.findByIdAndUser(collectionId, user)
+                        .orElseThrow(() ->
+                                new RuntimeException("Collection not found")
+                        );
+
+        bookmark.setCollection(collection);
+
+        bookmarkRepository.save(bookmark);
     }
 
     private BookmarkResponseDTO toResponse(
