@@ -1,19 +1,23 @@
 package com.sift.modules.collection;
 
+import com.sift.modules.bookmark.BookmarkRepository;
 import com.sift.modules.user.UserEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class CollectionService {
 
     private final CollectionRepository collectionRepository;
+    private final BookmarkRepository bookmarkRepository;
 
-    public CollectionService(CollectionRepository collectionRepository) {
+    public CollectionService(CollectionRepository collectionRepository, BookmarkRepository bookmarkRepository) {
         this.collectionRepository = collectionRepository;
+        this.bookmarkRepository = bookmarkRepository;
     }
 
     @Transactional
@@ -48,6 +52,31 @@ public class CollectionService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public void deleteCollection(
+            Authentication authentication,
+            UUID collectionId
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        CollectionEntity collection =
+                collectionRepository
+                        .findByIdAndUser(collectionId, user)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Collection not found"
+                                )
+                        );
+
+        // Move all bookmarks in this collection
+        // back to the Inbox.
+        bookmarkRepository.moveBookmarksToInbox(collection);
+
+        // Now the collection can safely be deleted.
+        collectionRepository.delete(collection);
     }
 
     private CollectionResponseDTO toResponse(

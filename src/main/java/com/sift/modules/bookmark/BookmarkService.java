@@ -146,6 +146,56 @@ public class BookmarkService {
     }
 
     @Transactional(readOnly = true)
+    public List<BookmarkResponseDTO> getInboxBookmarks(
+            Authentication authentication
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        List<BookmarkEntity> bookmarks =
+                bookmarkRepository
+                        .findAllByUserIdAndCollectionIsNullOrderBySavedAtDesc(
+                                user.getId()
+                        );
+
+        return buildBookmarkResponses(bookmarks);
+    }
+
+
+    @Transactional(readOnly = true)
+    public List<BookmarkResponseDTO> getFavoriteBookmarks(
+            Authentication authentication
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        List<BookmarkEntity> bookmarks =
+                bookmarkRepository
+                        .findAllByUserIdAndFavoriteTrueOrderBySavedAtDesc(
+                                user.getId()
+                        );
+
+        return buildBookmarkResponses(bookmarks);
+    }
+
+
+    @Transactional(readOnly = true)
+    public List<BookmarkResponseDTO> getUnreadBookmarks(
+            Authentication authentication
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        List<BookmarkEntity> bookmarks =
+                bookmarkRepository
+                        .findAllByUserIdAndReadFalseOrderBySavedAtDesc(
+                                user.getId()
+                        );
+
+        return buildBookmarkResponses(bookmarks);
+    }
+
+    @Transactional(readOnly = true)
     public List<BookmarkResponseDTO> getBookmarksInCollection(
             Authentication authentication,
             UUID collectionId
@@ -270,6 +320,72 @@ public class BookmarkService {
                     );
                 })
                 .toList();
+    }
+
+    @Transactional
+    public BookmarkResponseDTO toggleFavorite(
+            Authentication authentication,
+            UUID bookmarkId
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        BookmarkEntity bookmark =
+                bookmarkRepository
+                        .findByIdAndUser(bookmarkId, user)
+                        .orElseThrow(() ->
+                                new RuntimeException("Bookmark not found")
+                        );
+
+        bookmark.setFavorite(!bookmark.isFavorite());
+
+        BookmarkEntity saved =
+                bookmarkRepository.save(bookmark);
+
+        return toResponseDTO(saved);
+    }
+
+
+    @Transactional
+    public BookmarkResponseDTO toggleRead(
+            Authentication authentication,
+            UUID bookmarkId
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        BookmarkEntity bookmark =
+                bookmarkRepository
+                        .findByIdAndUser(bookmarkId, user)
+                        .orElseThrow(() ->
+                                new RuntimeException("Bookmark not found")
+                        );
+
+        bookmark.setRead(!bookmark.isRead());
+
+        BookmarkEntity saved =
+                bookmarkRepository.save(bookmark);
+
+        return toResponseDTO(saved);
+    }
+
+
+    @Transactional
+    public void deleteBookmark(
+            Authentication authentication,
+            UUID bookmarkId
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        BookmarkEntity bookmark =
+                bookmarkRepository
+                        .findByIdAndUser(bookmarkId, user)
+                        .orElseThrow(() ->
+                                new RuntimeException("Bookmark not found")
+                        );
+
+        bookmarkRepository.delete(bookmark);
     }
 
     @Transactional
@@ -478,4 +594,113 @@ public class BookmarkService {
                 note
         );
     }
+
+    private List<BookmarkResponseDTO> buildBookmarkResponses(
+            List<BookmarkEntity> bookmarks
+    ) {
+        if (bookmarks.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> bookmarkIds =
+                bookmarks.stream()
+                        .map(BookmarkEntity::getId)
+                        .toList();
+
+        // Fetch all tags in one query.
+        List<BookmarkTagEntity> bookmarkTags =
+                bookmarkTagRepository
+                        .findAllByBookmarkIdIn(bookmarkIds);
+
+        Map<UUID, List<TagResponseDTO>> tagsByBookmark =
+                bookmarkTags.stream()
+                        .collect(Collectors.groupingBy(
+                                BookmarkTagEntity::getBookmarkId,
+                                Collectors.mapping(
+                                        bookmarkTag ->
+                                                new TagResponseDTO(
+                                                        bookmarkTag.getTag().getId(),
+                                                        bookmarkTag.getTag().getName()
+                                                ),
+                                        Collectors.toList()
+                                )
+                        ));
+
+        // Fetch all notes in one query.
+        List<BookmarkNoteEntity> notes =
+                bookmarkNoteRepository
+                        .findAllByBookmarkIdIn(bookmarkIds);
+
+        Map<UUID, BookmarkNoteEntity> notesByBookmark =
+                notes.stream()
+                        .collect(Collectors.toMap(
+                                note -> note.getBookmark().getId(),
+                                Function.identity()
+                        ));
+
+        return bookmarks.stream()
+                .map(bookmark -> {
+
+                    List<TagResponseDTO> tags =
+                            tagsByBookmark.getOrDefault(
+                                    bookmark.getId(),
+                                    List.of()
+                            );
+
+                    BookmarkNoteEntity note =
+                            notesByBookmark.get(bookmark.getId());
+
+                    NoteResponseDTO noteResponse =
+                            note == null
+                                    ? null
+                                    : new NoteResponseDTO(
+                                    note.getId(),
+                                    bookmark.getId(),
+                                    note.getContent(),
+                                    note.getCreatedAt(),
+                                    note.getUpdatedAt()
+                            );
+
+                    TweetEntity tweet = bookmark.getTweet();
+
+                    TweetResponseDTO tweetDTO =
+                            new TweetResponseDTO(
+                                    tweet.getId(),
+                                    tweet.getUrl(),
+                                    tweet.getAuthorUsername(),
+                                    tweet.getAuthorName(),
+                                    tweet.getText(),
+                                    tweet.getCreatedAt()
+                            );
+
+                    CollectionResponseDTO collectionDTO = null;
+
+                    if (bookmark.getCollection() != null) {
+                        CollectionEntity collection =
+                                bookmark.getCollection();
+
+                        collectionDTO =
+                                new CollectionResponseDTO(
+                                        collection.getId(),
+                                        collection.getName(),
+                                        collection.getDescription(),
+                                        collection.getCreatedAt(),
+                                        collection.getUpdatedAt()
+                                );
+                    }
+
+                    return new BookmarkResponseDTO(
+                            bookmark.getId(),
+                            tweetDTO,
+                            collectionDTO,
+                            bookmark.isFavorite(),
+                            bookmark.isRead(),
+                            bookmark.getSavedAt(),
+                            tags,
+                            noteResponse
+                    );
+                })
+                .toList();
+    }
+
 }

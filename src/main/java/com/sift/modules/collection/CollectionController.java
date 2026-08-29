@@ -6,6 +6,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/collections")
@@ -42,5 +43,18 @@ public class CollectionController {
         return ResponseEntity.ok(
                 collectionService.getCollections(authentication)
         );
+    }
+
+    @DeleteMapping("/{collectionId}")
+    public ResponseEntity<Void> deleteCollection(
+            Authentication authentication,
+            @PathVariable UUID collectionId
+    ) {
+        collectionService.deleteCollection(
+                authentication,
+                collectionId
+        );
+
+        return ResponseEntity.noContent().build();
     }
 }
