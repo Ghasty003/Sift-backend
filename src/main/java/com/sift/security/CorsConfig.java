@@ -19,7 +19,8 @@ public class CorsConfig {
 
         configuration.setAllowedOrigins(
                 List.of(
-                        "http://localhost:8443"
+                        "http://localhost:8443",
+                        "chrome-extension://jmjocneafpiaaddkcmnmmaelbggmddfh"
                 )
         );
 
