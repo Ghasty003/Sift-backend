@@ -135,4 +135,12 @@ public class BookmarkController {
         );
     }
 
+    @GetMapping("/summary")
+    public ResponseEntity<BookmarkSummaryResponseDTO> getBookmarkSummary(
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                bookmarkService.getBookmarkSummary(authentication)
+        );
+    }
 }

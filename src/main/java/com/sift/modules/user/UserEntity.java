@@ -99,4 +99,8 @@ public class UserEntity implements UserDetails {
     public String getUsername() {
         return email;
     }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

@@ -115,4 +115,8 @@ public class ApiTokenEntity {
     public UUID getId() {
         return id;
     }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

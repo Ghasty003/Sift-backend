@@ -56,4 +56,9 @@ public interface BookmarkRepository extends JpaRepository<BookmarkEntity, UUID> 
             @Param("collection") CollectionEntity collection
     );
 
+    long countByUser_IdAndCollectionIsNull(UUID userId);
+
+    long countByUser_IdAndFavoriteTrue(UUID userId);
+
+    List<BookmarkEntity> findTop5ByUser_IdOrderBySavedAtDesc(UUID userId);
 }

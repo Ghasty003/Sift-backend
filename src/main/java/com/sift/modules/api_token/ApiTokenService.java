@@ -6,14 +6,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
-import java.util.Optional;
+import java.util.*;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
-import java.util.Base64;
-import java.util.HexFormat;
-import java.util.UUID;
 
 @Service
 public class ApiTokenService {
@@ -112,6 +109,51 @@ public class ApiTokenService {
         apiToken.setLastUsedAt(OffsetDateTime.now());
 
         return Optional.of(apiToken.getUser());
+    }
+
+    @Transactional
+    public void revokeToken(
+            Authentication authentication,
+            String tokenId
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        ApiTokenEntity token =
+                apiTokenRepository
+                        .findByTokenIdAndUser(tokenId, user)
+                        .orElseThrow(() ->
+                                new RuntimeException("API token not found")
+                        );
+
+        if (token.getRevokedAt() != null) {
+            return;
+        }
+
+        token.setRevokedAt(OffsetDateTime.now());
+
+        apiTokenRepository.save(token);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ApiTokenResponseDTO> getUserTokens(
+            Authentication authentication
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        return apiTokenRepository
+                .findAllByUserOrderByCreatedAtDesc(user)
+                .stream()
+                .map(token -> new ApiTokenResponseDTO(
+                        token.getTokenId(),
+                        token.getName(),
+                        token.getType(),
+                        token.getCreatedAt(),
+                        token.getLastUsedAt(),
+                        token.getRevokedAt()
+                ))
+                .toList();
     }
 
     private String hashToken(String token) {

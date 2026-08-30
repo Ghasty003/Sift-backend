@@ -476,6 +476,41 @@ public class BookmarkService {
         bookmarkRepository.save(bookmark);
     }
 
+    @Transactional(readOnly = true)
+    public BookmarkSummaryResponseDTO getBookmarkSummary(
+            Authentication authentication
+    ) {
+        UserEntity user =
+                (UserEntity) authentication.getPrincipal();
+
+        long inboxCount =
+                bookmarkRepository.countByUser_IdAndCollectionIsNull(
+                        user.getId()
+                );
+
+        long favoriteCount =
+                bookmarkRepository.countByUser_IdAndFavoriteTrue(
+                        user.getId()
+                );
+
+        List<BookmarkEntity> recentBookmarks =
+                bookmarkRepository
+                        .findTop5ByUser_IdOrderBySavedAtDesc(
+                                user.getId()
+                        );
+
+        List<BookmarkResponseDTO> recentBookmarkDTOs =
+                recentBookmarks.stream()
+                        .map(this::toResponseDTO)
+                        .toList();
+
+        return new BookmarkSummaryResponseDTO(
+                inboxCount,
+                favoriteCount,
+                recentBookmarkDTOs
+        );
+    }
+
     private BookmarkResponseDTO toResponseDTO(
             BookmarkEntity bookmark
     ) {
