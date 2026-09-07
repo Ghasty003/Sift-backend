@@ -1,5 +1,7 @@
 package com.sift.modules.tag;
 
+import com.sift.exceptions.BadRequestException;
+import com.sift.exceptions.ResourceNotFoundException;
 import com.sift.modules.bookmark.BookmarkEntity;
 import com.sift.modules.bookmark.BookmarkRepository;
 import com.sift.modules.user.UserEntity;
@@ -36,7 +38,7 @@ public class TagService {
         String name = request.name().trim();
 
         if (name.isBlank()) {
-            throw new IllegalArgumentException("Tag name cannot be empty");
+            throw new BadRequestException("Tag name cannot be empty");
         }
 
         assert user != null;
@@ -83,13 +85,13 @@ public class TagService {
         BookmarkEntity bookmark = bookmarkRepository
                 .findByIdAndUserId(bookmarkId, user.getId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Bookmark not found")
+                        new ResourceNotFoundException("Bookmark not found")
                 );
 
         TagEntity tag = tagRepository
                 .findByIdAndUserId(tagId, user.getId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Tag not found")
+                        new ResourceNotFoundException("Tag not found")
                 );
 
         if (bookmarkTagRepository
@@ -118,13 +120,13 @@ public class TagService {
         bookmarkRepository
                 .findByIdAndUserId(bookmarkId, user.getId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Bookmark not found")
+                        new ResourceNotFoundException("Bookmark not found")
                 );
 
         tagRepository
                 .findByIdAndUserId(tagId, user.getId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Tag not found")
+                        new ResourceNotFoundException("Tag not found")
                 );
 
         bookmarkTagRepository.deleteByBookmarkIdAndTagId(
@@ -143,7 +145,7 @@ public class TagService {
         bookmarkRepository
                 .findByIdAndUserId(bookmarkId, user.getId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Bookmark not found")
+                        new ResourceNotFoundException("Bookmark not found")
                 );
 
         return bookmarkTagRepository

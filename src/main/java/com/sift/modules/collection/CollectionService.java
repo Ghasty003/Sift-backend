@@ -1,5 +1,6 @@
 package com.sift.modules.collection;
 
+import com.sift.exceptions.ResourceNotFoundException;
 import com.sift.modules.bookmark.BookmarkRepository;
 import com.sift.modules.user.UserEntity;
 import org.springframework.security.core.Authentication;
@@ -66,7 +67,7 @@ public class CollectionService {
                 collectionRepository
                         .findByIdAndUser(collectionId, user)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Collection not found"
                                 )
                         );
