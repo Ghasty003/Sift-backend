@@ -1,5 +1,7 @@
 package com.sift.modules.bookmark;
 
+import com.sift.exceptions.ConflictException;
+import com.sift.exceptions.ResourceNotFoundException;
 import com.sift.modules.collection.CollectionEntity;
 import com.sift.modules.collection.CollectionRepository;
 import com.sift.modules.collection.CollectionResponseDTO;
@@ -208,7 +210,7 @@ public class BookmarkService {
                 collectionRepository
                         .findByIdAndUser(collectionId, user)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Collection not found"
                                 )
                         );
@@ -334,7 +336,7 @@ public class BookmarkService {
                 bookmarkRepository
                         .findByIdAndUser(bookmarkId, user)
                         .orElseThrow(() ->
-                                new RuntimeException("Bookmark not found")
+                                new ResourceNotFoundException("Bookmark not found")
                         );
 
         bookmark.setFavorite(!bookmark.isFavorite());
@@ -358,7 +360,7 @@ public class BookmarkService {
                 bookmarkRepository
                         .findByIdAndUser(bookmarkId, user)
                         .orElseThrow(() ->
-                                new RuntimeException("Bookmark not found")
+                                new ResourceNotFoundException("Bookmark not found")
                         );
 
         bookmark.setRead(!bookmark.isRead());
@@ -382,7 +384,7 @@ public class BookmarkService {
                 bookmarkRepository
                         .findByIdAndUser(bookmarkId, user)
                         .orElseThrow(() ->
-                                new RuntimeException("Bookmark not found")
+                                new ResourceNotFoundException("Bookmark not found")
                         );
 
         bookmarkRepository.delete(bookmark);
@@ -408,7 +410,7 @@ public class BookmarkService {
                 user.getId(),
                 tweet.getId()
         )) {
-            throw new IllegalStateException(
+            throw new ConflictException(
                     "Tweet has already been bookmarked"
             );
         }
@@ -457,16 +459,14 @@ public class BookmarkService {
                 bookmarkRepository
                         .findByIdAndUser(bookmarkId, user)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Bookmark not found"
-                                )
+                                new ResourceNotFoundException("Bookmark not found")
                         );
 
         CollectionEntity collection =
                 collectionRepository
                         .findByIdAndUser(collectionId, user)
                         .orElseThrow(() ->
-                                new RuntimeException(
+                                new ResourceNotFoundException(
                                         "Collection not found"
                                 )
                         );

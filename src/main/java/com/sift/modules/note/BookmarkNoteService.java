@@ -1,5 +1,7 @@
 package com.sift.modules.note;
 
+import com.sift.exceptions.BadRequestException;
+import com.sift.exceptions.ResourceNotFoundException;
 import com.sift.modules.bookmark.BookmarkEntity;
 import com.sift.modules.bookmark.BookmarkRepository;
 import com.sift.modules.user.UserEntity;
@@ -34,13 +36,13 @@ public class BookmarkNoteService {
         BookmarkEntity bookmark = bookmarkRepository
                 .findByIdAndUserId(bookmarkId, user.getId())
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Bookmark not found")
+                        new ResourceNotFoundException("Bookmark not found")
                 );
 
         String content = request.content().trim();
 
         if (content.isBlank()) {
-            throw new IllegalArgumentException(
+            throw new BadRequestException(
                     "Note content cannot be empty"
             );
         }

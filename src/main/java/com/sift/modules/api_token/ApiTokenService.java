@@ -1,5 +1,6 @@
 package com.sift.modules.api_token;
 
+import com.sift.exceptions.ResourceNotFoundException;
 import com.sift.modules.user.UserEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -123,7 +124,7 @@ public class ApiTokenService {
                 apiTokenRepository
                         .findByTokenIdAndUser(tokenId, user)
                         .orElseThrow(() ->
-                                new RuntimeException("API token not found")
+                                new ResourceNotFoundException("API token not found")
                         );
 
         if (token.getRevokedAt() != null) {
