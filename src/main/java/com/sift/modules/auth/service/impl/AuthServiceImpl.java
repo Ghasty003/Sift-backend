@@ -7,13 +7,13 @@ import com.sift.modules.auth.dto.RegisterRequest;
 import com.sift.modules.auth.service.AuthService;
 import com.sift.modules.user.UserEntity;
 import com.sift.modules.user.UserRepository;
+import com.sift.modules.user.UserResponseDTO;
 import com.sift.security.JwtService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -51,7 +51,7 @@ public class AuthServiceImpl implements AuthService {
         assert user != null;
         String token = jwtService.generateToken(user);
 
-        return new LoginResponse(token);
+        return new LoginResponse(token, toUserResponseDTO(user));
     }
 
     @Override
@@ -64,6 +64,7 @@ public class AuthServiceImpl implements AuthService {
         UserEntity user = new UserEntity();
 
         user.setEmail(registerRequest.email());
+        user.setFullName(registerRequest.fullName());
         user.setPasswordHash(
                 passwordEncoder.encode(registerRequest.password())
         );
@@ -95,6 +96,15 @@ public class AuthServiceImpl implements AuthService {
         assert authenticatedUser != null;
         String token = jwtService.generateToken(authenticatedUser);
 
-        return new LoginResponse(token);
+        return new LoginResponse(token, toUserResponseDTO(authenticatedUser));
+    }
+
+    private UserResponseDTO toUserResponseDTO(UserEntity user) {
+        return new UserResponseDTO(
+                user.getId(),
+                user.getEmail(),
+                user.getFullName(),
+                user.getCreatedAt()
+        );
     }
 }
