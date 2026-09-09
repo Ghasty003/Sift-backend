@@ -33,6 +33,13 @@ public class UserEntity implements UserDetails {
     private String email;
 
     @Column(
+            name = "full_name",
+            nullable = false,
+            length = 255
+    )
+    private String fullName;
+
+    @Column(
             name = "password_hash",
             nullable = false,
             length = 255
@@ -75,6 +82,14 @@ public class UserEntity implements UserDetails {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getFullName() {
+        return fullName;
+    }
+
+    public void setFullName(String fullName) {
+        this.fullName = fullName;
     }
 
     public String getPasswordHash() {
