@@ -26,4 +26,8 @@ springdoc:
 
 jwt:
   secret: 7QkLm8PxV2zNc5HrA1sDf9JyUwE4RtBx6MvZ0XcGpFnHsKaQ
-  expiration: 3600000
+  expiration: 900000          # 15 min — access token
+  refresh-expiration: 3600000 # 1hr sliding window — refresh token
+
+app:
+  cookie-secure: false # flip to true once served over HTTPS (staging/prod)

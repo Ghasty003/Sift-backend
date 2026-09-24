@@ -1,10 +1,12 @@
 package com.sift.modules.auth.service.impl;
 
+import com.sift.exceptions.InvalidRefreshTokenException;
 import com.sift.exceptions.UserAlreadyExistException;
 import com.sift.modules.auth.dto.LoginRequest;
 import com.sift.modules.auth.dto.LoginResponse;
 import com.sift.modules.auth.dto.RegisterRequest;
 import com.sift.modules.auth.service.AuthService;
+import com.sift.modules.refresh_token.RefreshTokenService;
 import com.sift.modules.user.UserEntity;
 import com.sift.modules.user.UserRepository;
 import com.sift.modules.user.UserResponseDTO;
@@ -22,22 +24,24 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthServiceImpl(
             AuthenticationManager authenticationManager,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService
+            JwtService jwtService,
+            RefreshTokenService refreshTokenService
     ) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Override
-    public LoginResponse login(LoginRequest loginRequest) {
-
+    public AuthResult login(LoginRequest loginRequest) {
         Authentication authentication =
                 authenticationManager.authenticate(
                         new UsernamePasswordAuthenticationToken(
@@ -47,41 +51,21 @@ public class AuthServiceImpl implements AuthService {
                 );
 
         UserEntity user = (UserEntity) authentication.getPrincipal();
-
-        assert user != null;
-        String token = jwtService.generateToken(user);
-
-        return new LoginResponse(token, toUserResponseDTO(user));
+        return issueSession(user);
     }
 
     @Override
-    public LoginResponse register(RegisterRequest registerRequest) {
-
+    public AuthResult register(RegisterRequest registerRequest) {
         if (userRepository.existsByEmail(registerRequest.email())) {
             throw new UserAlreadyExistException();
         }
 
         UserEntity user = new UserEntity();
-
         user.setEmail(registerRequest.email());
         user.setFullName(registerRequest.fullName());
-        user.setPasswordHash(
-                passwordEncoder.encode(registerRequest.password())
-        );
-
+        user.setPasswordHash(passwordEncoder.encode(registerRequest.password()));
         userRepository.save(user);
 
-        /*
-         * Authenticate the newly-created user.
-         *
-         * This means registration behaves like:
-         *
-         * create account
-         *      ↓
-         * authenticate
-         *      ↓
-         * generate JWT
-         */
         Authentication authentication =
                 authenticationManager.authenticate(
                         new UsernamePasswordAuthenticationToken(
@@ -90,13 +74,41 @@ public class AuthServiceImpl implements AuthService {
                         )
                 );
 
-        UserEntity authenticatedUser =
-                (UserEntity) authentication.getPrincipal();
+        UserEntity authenticatedUser = (UserEntity) authentication.getPrincipal();
+        return issueSession(authenticatedUser);
+    }
 
-        assert authenticatedUser != null;
-        String token = jwtService.generateToken(authenticatedUser);
+    @Override
+    public RefreshResult refresh(String rawRefreshToken) {
+        if (rawRefreshToken == null) {
+            throw new InvalidRefreshTokenException("No refresh token provided");
+        }
 
-        return new LoginResponse(token, toUserResponseDTO(authenticatedUser));
+        RefreshTokenService.IssuedToken rotated = refreshTokenService.rotate(rawRefreshToken);
+
+        // The rotated token only carries userId, not the full user — re-fetch
+        // so JwtService (which expects a UserDetails) gets what it needs,
+        // the same way login/register already do.
+        UserEntity user = userRepository.findById(rotated.userId())
+                .orElseThrow(() -> new InvalidRefreshTokenException("User no longer exists"));
+
+        String accessToken = jwtService.generateToken(user);
+        return new RefreshResult(accessToken, rotated.rawToken());
+    }
+
+    @Override
+    public void logout(String rawRefreshToken) {
+        if (rawRefreshToken != null) {
+            refreshTokenService.revokeByToken(rawRefreshToken);
+        }
+    }
+
+    private AuthResult issueSession(UserEntity user) {
+        String accessToken = jwtService.generateToken(user);
+        RefreshTokenService.IssuedToken issued = refreshTokenService.issue(user.getId());
+
+        LoginResponse response = new LoginResponse(accessToken, toUserResponseDTO(user));
+        return new AuthResult(response, issued.rawToken());
     }
 
     private UserResponseDTO toUserResponseDTO(UserEntity user) {

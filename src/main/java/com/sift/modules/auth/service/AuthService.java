@@ -6,7 +6,11 @@ import com.sift.modules.auth.dto.RegisterRequest;
 
 public interface AuthService {
 
-    LoginResponse login(LoginRequest loginRequest);
+    record AuthResult(LoginResponse loginResponse, String rawRefreshToken) {}
+    record RefreshResult(String accessToken, String newRawRefreshToken) {}
 
-    LoginResponse register(RegisterRequest registerRequest);
+    AuthResult login(LoginRequest loginRequest);
+    AuthResult register(RegisterRequest registerRequest);
+    RefreshResult refresh(String rawRefreshToken);
+    void logout(String rawRefreshToken);
 }
