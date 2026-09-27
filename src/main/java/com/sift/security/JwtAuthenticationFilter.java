@@ -50,32 +50,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String username = jwtService.extractUsername(jwt);
+        try {
+            String username = jwtService.extractUsername(jwt);
 
-        if (username != null &&
-                SecurityContextHolder.getContext().getAuthentication() == null) {
+            if (username != null &&
+                    SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(username);
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(username);
 
-            if (jwtService.isTokenValid(jwt, userDetails)) {
+                if (jwtService.isTokenValid(jwt, userDetails)) {
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
 
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource()
+                                    .buildDetails(request)
+                    );
 
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(authentication);
+                    SecurityContextHolder
+                            .getContext()
+                            .setAuthentication(authentication);
+                }
             }
+        } catch (io.jsonwebtoken.JwtException e) {
+            // Expired, malformed, or invalid signature — leave the request
+            // unauthenticated rather than blow up the filter chain. Spring
+            // Security's own entry point then produces a clean 401, which is
+            // exactly what the frontend's refresh-on-401 interceptor expects.
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
