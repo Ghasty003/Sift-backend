@@ -1,6 +1,8 @@
 package com.sift.modules.tag;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.UUID;
@@ -31,4 +33,17 @@ public interface BookmarkTagRepository
     void deleteAllByBookmarkId(
             UUID bookmarkId
     );
+
+    interface TagBookmarkStats {
+        UUID getTagId();
+        long getTotal();
+    }
+
+    @Query("""
+        SELECT bt.tag.id AS tagId, COUNT(bt) AS total
+        FROM BookmarkTagEntity bt
+        WHERE bt.bookmark.user.id = :userId
+        GROUP BY bt.tag.id
+        """)
+    List<TagBookmarkStats> countByTagForUser(@Param("userId") UUID userId);
 }

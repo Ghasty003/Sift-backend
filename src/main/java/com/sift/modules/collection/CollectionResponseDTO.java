@@ -8,6 +8,8 @@ public record CollectionResponseDTO(
         String name,
         String description,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        long bookmarkCount,
+        long unreadCount
 ) {
 }

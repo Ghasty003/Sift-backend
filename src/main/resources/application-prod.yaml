@@ -1,0 +1,9 @@
+jwt:
+  # No fallback here on purpose — if JWT_SECRET isn't set in the prod
+  # environment, Spring fails fast at startup with a clear "could not
+  # resolve placeholder" error, rather than silently running with the
+  # dev-only default from application.yaml.
+  secret: ${JWT_SECRET}
+
+app:
+  cookie-secure: true # required once served over HTTPS — see RefreshCookieUtil
