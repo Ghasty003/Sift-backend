@@ -66,9 +66,7 @@ public class BookmarkService {
         if (filter.collectionId() != null && !inboxOnly) {
             CollectionEntity collection = collectionRepository
                     .findByIdAndUser(UUID.fromString(filter.collectionId()), user)
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException("Collection not found")
-                    );
+                    .orElseThrow(() -> new ResourceNotFoundException("Collection not found"));
             collectionId = collection.getId();
         }
         boolean hasCollectionId = collectionId != null;
@@ -82,37 +80,33 @@ public class BookmarkService {
                 : "%" + filter.search().trim().toLowerCase() + "%";
         boolean hasSearch = searchPattern != null;
 
-        BookmarkCursor cursor = filter.cursor() != null
-                ? BookmarkCursor.decode(filter.cursor())
-                : null;
+        BookmarkCursor cursor = filter.cursor() != null ? BookmarkCursor.decode(filter.cursor()) : null;
         boolean hasCursor = cursor != null;
 
         int limit = filter.limit() != null
                 ? Math.min(Math.max(filter.limit(), 1), MAX_PAGE_SIZE)
                 : DEFAULT_PAGE_SIZE;
 
-        // Every optional filter now always passes a real, correctly-typed
-        // value — the boolean hasX flag controls whether it's actually
-        // applied (via ":hasX = false OR ...", same pattern as inboxOnly/
-        // favoriteOnly above). The dummy values below are never logically
-        // used when their flag is false; they exist only so Postgres always
-        // has a concrete type to resolve for every parameter — a parameter
-        // bound to null with no other type context (e.g. ":x IS NULL" alone)
-        // is what caused "could not determine data type of parameter".
-        List<BookmarkEntity> rows = bookmarkRepository.searchBookmarks(
-                user.getId(),
-                inboxOnly,
-                hasCollectionId,
+        boolean ascending = "oldest".equals(filter.sort());
+
+        List<BookmarkEntity> rows = ascending
+                ? bookmarkRepository.searchBookmarksAscending(
+                user.getId(), inboxOnly, hasCollectionId,
                 hasCollectionId ? collectionId : new UUID(0, 0),
-                filter.favoriteOnly(),
-                hasReadFilter,
-                readFilter,
-                hasTagId,
-                hasTagId ? filter.tagId() : new UUID(0, 0),
-                hasSearch,
-                hasSearch ? searchPattern : "",
-                hasCursor,
-                hasCursor ? cursor.savedAt() : OffsetDateTime.now(),
+                filter.favoriteOnly(), hasReadFilter, readFilter,
+                hasTagId, hasTagId ? filter.tagId() : new UUID(0, 0),
+                hasSearch, hasSearch ? searchPattern : "",
+                hasCursor, hasCursor ? cursor.savedAt() : OffsetDateTime.now(),
+                hasCursor ? cursor.id() : new UUID(0, 0),
+                PageRequest.of(0, limit + 1)
+        )
+                : bookmarkRepository.searchBookmarks(
+                user.getId(), inboxOnly, hasCollectionId,
+                hasCollectionId ? collectionId : new UUID(0, 0),
+                filter.favoriteOnly(), hasReadFilter, readFilter,
+                hasTagId, hasTagId ? filter.tagId() : new UUID(0, 0),
+                hasSearch, hasSearch ? searchPattern : "",
+                hasCursor, hasCursor ? cursor.savedAt() : OffsetDateTime.now(),
                 hasCursor ? cursor.id() : new UUID(0, 0),
                 PageRequest.of(0, limit + 1)
         );
@@ -130,6 +124,23 @@ public class BookmarkService {
                 : null;
 
         return new CursorPageResponseDTO<>(items, nextCursor, hasMore);
+    }
+
+    @Transactional
+    public int bulkDelete(Authentication authentication, List<UUID> bookmarkIds) {
+        UserEntity user = (UserEntity) authentication.getPrincipal();
+        return bookmarkRepository.deleteAllByIdInAndUserId(bookmarkIds, user.getId());
+    }
+
+    @Transactional
+    public int bulkMove(Authentication authentication, List<UUID> bookmarkIds, UUID collectionId) {
+        UserEntity user = (UserEntity) authentication.getPrincipal();
+        // Ownership of the target collection is checked once here, rather than
+        // per-bookmark, since the bulk update itself already scopes by user.id
+        // on the bookmark side.
+        collectionRepository.findByIdAndUser(collectionId, user)
+                .orElseThrow(() -> new ResourceNotFoundException("Collection not found"));
+        return bookmarkRepository.moveAllByIdInAndUserId(bookmarkIds, collectionId, user.getId());
     }
 
     @Transactional

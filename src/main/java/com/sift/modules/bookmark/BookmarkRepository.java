@@ -121,4 +121,55 @@ public interface BookmarkRepository extends JpaRepository<BookmarkEntity, UUID> 
         WHERE b.user.id = :userId AND b.read = false
         """)
     int markAllAsRead(@Param("userId") UUID userId);
+
+    @Query("""
+        SELECT DISTINCT b FROM BookmarkEntity b
+        LEFT JOIN b.tags t
+        LEFT JOIN b.note n
+        WHERE b.user.id = :userId
+          AND (:inboxOnly = false OR b.collection IS NULL)
+          AND (:hasCollectionId = false OR b.collection.id = :collectionId)
+          AND (:favoriteOnly = false OR b.favorite = true)
+          AND (:hasReadFilter = false OR b.read = :readFilter)
+          AND (:hasTagId = false OR t.id = :tagId)
+          AND (
+              :hasSearch = false
+              OR LOWER(b.tweet.text) LIKE :search
+              OR LOWER(b.tweet.authorName) LIKE :search
+              OR LOWER(b.tweet.authorUsername) LIKE :search
+              OR LOWER(n.content) LIKE :search
+              OR LOWER(t.name) LIKE :search
+          )
+          AND (
+              :hasCursor = false
+              OR b.savedAt > :cursorSavedAt
+              OR (b.savedAt = :cursorSavedAt AND b.id > :cursorId)
+          )
+        ORDER BY b.savedAt ASC, b.id ASC
+        """)
+    List<BookmarkEntity> searchBookmarksAscending(
+            @Param("userId") UUID userId,
+            @Param("inboxOnly") boolean inboxOnly,
+            @Param("hasCollectionId") boolean hasCollectionId,
+            @Param("collectionId") UUID collectionId,
+            @Param("favoriteOnly") boolean favoriteOnly,
+            @Param("hasReadFilter") boolean hasReadFilter,
+            @Param("readFilter") boolean readFilter,
+            @Param("hasTagId") boolean hasTagId,
+            @Param("tagId") UUID tagId,
+            @Param("hasSearch") boolean hasSearch,
+            @Param("search") String search,
+            @Param("hasCursor") boolean hasCursor,
+            @Param("cursorSavedAt") OffsetDateTime cursorSavedAt,
+            @Param("cursorId") UUID cursorId,
+            Pageable pageable
+    );
+
+    @Modifying
+    @Query("DELETE FROM BookmarkEntity b WHERE b.id IN :ids AND b.user.id = :userId")
+    int deleteAllByIdInAndUserId(@Param("ids") List<UUID> ids, @Param("userId") UUID userId);
+
+    @Modifying
+    @Query("UPDATE BookmarkEntity b SET b.collection.id = :collectionId WHERE b.id IN :ids AND b.user.id = :userId")
+    int moveAllByIdInAndUserId(@Param("ids") List<UUID> ids, @Param("collectionId") UUID collectionId, @Param("userId") UUID userId);
 }
