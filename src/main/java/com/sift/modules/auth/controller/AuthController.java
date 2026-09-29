@@ -1,6 +1,5 @@
 package com.sift.modules.auth.controller;
 
-import com.sift.modules.auth.dto.AccessTokenResponse;
 import com.sift.modules.auth.dto.LoginRequest;
 import com.sift.modules.auth.dto.LoginResponse;
 import com.sift.modules.auth.dto.RegisterRequest;
@@ -9,6 +8,7 @@ import com.sift.security.RefreshCookieUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +28,9 @@ public class AuthController {
         this.refreshCookieUtil = refreshCookieUtil;
     }
 
+    public record GoogleLoginRequest(@NotBlank String idToken) {}
+    public record AccessTokenResponse(String accessToken) {}
+
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
         return withRefreshCookie(authService.login(loginRequest));
@@ -36,6 +39,11 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
         return withRefreshCookie(authService.register(registerRequest));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<LoginResponse> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request) {
+        return withRefreshCookie(authService.loginWithGoogle(request.idToken()));
     }
 
     @PostMapping("/refresh")

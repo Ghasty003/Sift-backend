@@ -7,6 +7,7 @@ public record UserResponseDTO(
         UUID id,
         String email,
         String fullName,
-        OffsetDateTime createdAt
+        OffsetDateTime createdAt,
+        boolean hasPassword
 ) {
 }

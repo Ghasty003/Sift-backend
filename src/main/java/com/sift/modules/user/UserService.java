@@ -1,5 +1,6 @@
 package com.sift.modules.user;
 
+import com.sift.exceptions.BadRequestException;
 import com.sift.exceptions.InvalidCredentialsException;
 import com.sift.modules.user.dto.ChangePasswordRequest;
 import com.sift.modules.user.dto.UpdateProfileRequest;
@@ -22,7 +23,6 @@ public class UserService {
     @Transactional(readOnly = true)
     public UserResponseDTO getCurrentUser(Authentication authentication) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
-
         return toUserResponseDTO(user);
     }
 
@@ -40,7 +40,13 @@ public class UserService {
     public void changePassword(Authentication authentication, ChangePasswordRequest request) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
 
-        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+        if (user.getPassword() == null) {
+            throw new BadRequestException(
+                    "This account signed in with Google and doesn't have a password yet"
+            );
+        }
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
             throw new InvalidCredentialsException("Current password is incorrect");
         }
 
@@ -51,7 +57,6 @@ public class UserService {
     @Transactional
     public void deleteAccount(Authentication authentication) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
-
         userRepository.delete(user);
     }
 
@@ -60,7 +65,8 @@ public class UserService {
                 user.getId(),
                 user.getEmail(),
                 user.getFullName(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                user.getPassword() != null
         );
     }
 }

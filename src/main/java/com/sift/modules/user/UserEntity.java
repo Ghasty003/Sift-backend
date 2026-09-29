@@ -26,43 +26,31 @@ public class UserEntity implements UserDetails {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(
-            nullable = false,
-            length = 255
-    )
+    @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(
-            name = "full_name",
-            nullable = false,
-            length = 255
-    )
+    @Column(name = "full_name", nullable = false, length = 255)
     private String fullName;
 
-    @Column(
-            name = "password_hash",
-            nullable = false,
-            length = 255
-    )
+    // Nullable now — a Google-only account never has one.
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
-    @Column(
-            name = "created_at",
-            nullable = false,
-            updatable = false
-    )
+    @Column(name = "auth_provider", nullable = false, length = 20)
+    private String authProvider = "local";
+
+    @Column(name = "google_id", unique = true, length = 255)
+    private String googleId;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
-    @Column(
-            name = "updated_at",
-            nullable = false
-    )
+    @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
     @PrePersist
     protected void onCreate() {
         OffsetDateTime now = OffsetDateTime.now();
-
         createdAt = now;
         updatedAt = now;
     }
@@ -92,12 +80,24 @@ public class UserEntity implements UserDetails {
         this.fullName = fullName;
     }
 
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public String getAuthProvider() {
+        return authProvider;
+    }
+
+    public void setAuthProvider(String authProvider) {
+        this.authProvider = authProvider;
+    }
+
+    public String getGoogleId() {
+        return googleId;
+    }
+
+    public void setGoogleId(String googleId) {
+        this.googleId = googleId;
     }
 
     @Override
