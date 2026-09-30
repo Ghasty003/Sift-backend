@@ -33,3 +33,4 @@ google:
 
 app:
   cookie-secure: false # flip to true once served over HTTPS (staging/prod)
+  frontend-url: ${FRONTEND_URL:http://localhost:8443}

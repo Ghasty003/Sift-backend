@@ -112,6 +112,19 @@ public class RefreshTokenService {
         return rawToken;
     }
 
+    /**
+     * Signs the user out of every active session/device — used after a
+     * password reset, since that's a strong "treat this account as
+     * potentially compromised" signal.
+     */
+    @Transactional
+    public void revokeAllSessionsForUser(UUID userId) {
+        List<RefreshTokenEntity> active = refreshTokenRepository.findByUserIdAndRevokedAtIsNull(userId);
+        OffsetDateTime now = OffsetDateTime.now();
+        active.forEach(t -> t.setRevokedAt(now));
+        refreshTokenRepository.saveAll(active);
+    }
+
     private String generateRawToken() {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
