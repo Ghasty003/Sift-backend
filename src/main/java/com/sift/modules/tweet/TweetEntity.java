@@ -9,14 +9,8 @@ import java.util.UUID;
 @Table(
         name = "tweets",
         uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_tweets_tweet_id",
-                        columnNames = "tweet_id"
-                ),
-                @UniqueConstraint(
-                        name = "uk_tweets_url",
-                        columnNames = "url"
-                )
+                @UniqueConstraint(name = "uk_tweets_tweet_id", columnNames = "tweet_id"),
+                @UniqueConstraint(name = "uk_tweets_url", columnNames = "url")
         }
 )
 public class TweetEntity {
@@ -25,17 +19,10 @@ public class TweetEntity {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(
-            name = "tweet_id",
-            nullable = false,
-            length = 50
-    )
+    @Column(name = "tweet_id", nullable = false, length = 50)
     private String tweetId;
 
-    @Column(
-            nullable = false,
-            columnDefinition = "TEXT"
-    )
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String url;
 
     @Column(name = "author_username")
@@ -44,7 +31,7 @@ public class TweetEntity {
     @Column(name = "author_name")
     private String authorName;
 
-    @Column(name = "author_avatar_url")
+    @Column(name = "author_avatar_url", columnDefinition = "TEXT")
     private String authorAvatarUrl;
 
     @Column(columnDefinition = "TEXT")
@@ -53,82 +40,53 @@ public class TweetEntity {
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
 
-    @Column(
-            name = "fetched_at",
-            nullable = false,
-            insertable = false
-    )
+    @Column(name = "fetched_at", nullable = false, insertable = false)
     private OffsetDateTime fetchedAt;
 
-    public UUID getId() {
-        return id;
-    }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+            name = "quoted_tweet_id",
+            foreignKey = @ForeignKey(name = "fk_tweets_quoted_tweet")
+    )
+    private TweetEntity quotedTweet;
 
-    public void setId(UUID id) {
-        this.id = id;
-    }
+    @Column(name = "is_reply", nullable = false)
+    private boolean reply = false;
 
-    public String getTweetId() {
-        return tweetId;
-    }
+    @Column(name = "reply_to_username")
+    private String replyToUsername;
 
-    public void setTweetId(String tweetId) {
-        this.tweetId = tweetId;
-    }
+    @Column(name = "reposted_by_name")
+    private String repostedByName;
 
-    public String getUrl() {
-        return url;
-    }
+    @Column(name = "reposted_by_username")
+    private String repostedByUsername;
 
-    public void setUrl(String url) {
-        this.url = url;
-    }
+    public String getRepostedByName() { return repostedByName; }
+    public void setRepostedByName(String repostedByName) { this.repostedByName = repostedByName; }
+    public String getRepostedByUsername() { return repostedByUsername; }
+    public void setRepostedByUsername(String repostedByUsername) { this.repostedByUsername = repostedByUsername; }
 
-    public String getAuthorUsername() {
-        return authorUsername;
-    }
-
-    public void setAuthorUsername(String authorUsername) {
-        this.authorUsername = authorUsername;
-    }
-
-    public String getAuthorName() {
-        return authorName;
-    }
-
-    public void setAuthorName(String authorName) {
-        this.authorName = authorName;
-    }
-
-    public String getAuthorAvatarUrl() {
-        return authorAvatarUrl;
-    }
-
-    public void setAuthorAvatarUrl(String authorAvatarUrl) {
-        this.authorAvatarUrl = authorAvatarUrl;
-    }
-
-    public String getText() {
-        return text;
-    }
-
-    public void setText(String text) {
-        this.text = text;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(OffsetDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public OffsetDateTime getFetchedAt() {
-        return fetchedAt;
-    }
-
-    public void setFetchedAt(OffsetDateTime fetchedAt) {
-        this.fetchedAt = fetchedAt;
-    }
+    public UUID getId() { return id; }
+    public String getTweetId() { return tweetId; }
+    public void setTweetId(String tweetId) { this.tweetId = tweetId; }
+    public String getUrl() { return url; }
+    public void setUrl(String url) { this.url = url; }
+    public String getAuthorUsername() { return authorUsername; }
+    public void setAuthorUsername(String authorUsername) { this.authorUsername = authorUsername; }
+    public String getAuthorName() { return authorName; }
+    public void setAuthorName(String authorName) { this.authorName = authorName; }
+    public String getAuthorAvatarUrl() { return authorAvatarUrl; }
+    public void setAuthorAvatarUrl(String authorAvatarUrl) { this.authorAvatarUrl = authorAvatarUrl; }
+    public String getText() { return text; }
+    public void setText(String text) { this.text = text; }
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    public OffsetDateTime getFetchedAt() { return fetchedAt; }
+    public TweetEntity getQuotedTweet() { return quotedTweet; }
+    public void setQuotedTweet(TweetEntity quotedTweet) { this.quotedTweet = quotedTweet; }
+    public boolean isReply() { return reply; }
+    public void setReply(boolean reply) { this.reply = reply; }
+    public String getReplyToUsername() { return replyToUsername; }
+    public void setReplyToUsername(String replyToUsername) { this.replyToUsername = replyToUsername; }
 }
