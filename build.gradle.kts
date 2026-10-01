@@ -19,6 +19,8 @@ repositories {
 }
 
 dependencies {
+    implementation("com.nimbusds:nimbus-jose-jwt:9.40")
+    implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-flyway")

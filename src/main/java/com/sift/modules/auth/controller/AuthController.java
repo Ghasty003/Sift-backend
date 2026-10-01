@@ -1,18 +1,21 @@
 package com.sift.modules.auth.controller;
 
-import com.sift.modules.auth.dto.AccessTokenResponse;
 import com.sift.modules.auth.dto.LoginRequest;
 import com.sift.modules.auth.dto.LoginResponse;
 import com.sift.modules.auth.dto.RegisterRequest;
 import com.sift.modules.auth.service.AuthService;
+import com.sift.modules.password_reset.ForgotPasswordRequest;
+import com.sift.modules.password_reset.ResetPasswordRequest;
 import com.sift.security.RefreshCookieUtil;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.sift.modules.password_reset.PasswordResetService;
 
 import java.util.Arrays;
 
@@ -22,11 +25,20 @@ public class AuthController {
 
     private final AuthService authService;
     private final RefreshCookieUtil refreshCookieUtil;
+    private final PasswordResetService passwordResetService;
 
-    public AuthController(AuthService authService, RefreshCookieUtil refreshCookieUtil) {
+    public AuthController(
+            AuthService authService,
+            RefreshCookieUtil refreshCookieUtil,
+            PasswordResetService passwordResetService
+    ) {
         this.authService = authService;
         this.refreshCookieUtil = refreshCookieUtil;
+        this.passwordResetService = passwordResetService;
     }
+
+    public record GoogleLoginRequest(@NotBlank String idToken) {}
+    public record AccessTokenResponse(String accessToken) {}
 
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
@@ -36,6 +48,11 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<LoginResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
         return withRefreshCookie(authService.register(registerRequest));
+    }
+
+    @PostMapping("/google")
+    public ResponseEntity<LoginResponse> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request) {
+        return withRefreshCookie(authService.loginWithGoogle(request.idToken()));
     }
 
     @PostMapping("/refresh")
@@ -62,6 +79,18 @@ public class AuthController {
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cleared.toString())
                 .build();
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        passwordResetService.requestReset(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        passwordResetService.resetPassword(request.token(), request.newPassword());
+        return ResponseEntity.noContent().build();
     }
 
     private ResponseEntity<LoginResponse> withRefreshCookie(AuthService.AuthResult result) {

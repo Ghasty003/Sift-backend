@@ -11,6 +11,7 @@ public interface AuthService {
 
     AuthResult login(LoginRequest loginRequest);
     AuthResult register(RegisterRequest registerRequest);
+    AuthResult loginWithGoogle(String idToken);
     RefreshResult refresh(String rawRefreshToken);
     void logout(String rawRefreshToken);
 }

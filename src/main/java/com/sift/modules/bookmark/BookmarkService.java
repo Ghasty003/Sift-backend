@@ -20,7 +20,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -66,9 +65,7 @@ public class BookmarkService {
         if (filter.collectionId() != null && !inboxOnly) {
             CollectionEntity collection = collectionRepository
                     .findByIdAndUser(UUID.fromString(filter.collectionId()), user)
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException("Collection not found")
-                    );
+                    .orElseThrow(() -> new ResourceNotFoundException("Collection not found"));
             collectionId = collection.getId();
         }
         boolean hasCollectionId = collectionId != null;
@@ -82,37 +79,33 @@ public class BookmarkService {
                 : "%" + filter.search().trim().toLowerCase() + "%";
         boolean hasSearch = searchPattern != null;
 
-        BookmarkCursor cursor = filter.cursor() != null
-                ? BookmarkCursor.decode(filter.cursor())
-                : null;
+        BookmarkCursor cursor = filter.cursor() != null ? BookmarkCursor.decode(filter.cursor()) : null;
         boolean hasCursor = cursor != null;
 
         int limit = filter.limit() != null
                 ? Math.min(Math.max(filter.limit(), 1), MAX_PAGE_SIZE)
                 : DEFAULT_PAGE_SIZE;
 
-        // Every optional filter now always passes a real, correctly-typed
-        // value — the boolean hasX flag controls whether it's actually
-        // applied (via ":hasX = false OR ...", same pattern as inboxOnly/
-        // favoriteOnly above). The dummy values below are never logically
-        // used when their flag is false; they exist only so Postgres always
-        // has a concrete type to resolve for every parameter — a parameter
-        // bound to null with no other type context (e.g. ":x IS NULL" alone)
-        // is what caused "could not determine data type of parameter".
-        List<BookmarkEntity> rows = bookmarkRepository.searchBookmarks(
-                user.getId(),
-                inboxOnly,
-                hasCollectionId,
+        boolean ascending = "oldest".equals(filter.sort());
+
+        List<BookmarkEntity> rows = ascending
+                ? bookmarkRepository.searchBookmarksAscending(
+                user.getId(), inboxOnly, hasCollectionId,
                 hasCollectionId ? collectionId : new UUID(0, 0),
-                filter.favoriteOnly(),
-                hasReadFilter,
-                readFilter,
-                hasTagId,
-                hasTagId ? filter.tagId() : new UUID(0, 0),
-                hasSearch,
-                hasSearch ? searchPattern : "",
-                hasCursor,
-                hasCursor ? cursor.savedAt() : OffsetDateTime.now(),
+                filter.favoriteOnly(), hasReadFilter, readFilter,
+                hasTagId, hasTagId ? filter.tagId() : new UUID(0, 0),
+                hasSearch, hasSearch ? searchPattern : "",
+                hasCursor, hasCursor ? cursor.savedAt() : java.time.OffsetDateTime.now(),
+                hasCursor ? cursor.id() : new UUID(0, 0),
+                PageRequest.of(0, limit + 1)
+        )
+                : bookmarkRepository.searchBookmarks(
+                user.getId(), inboxOnly, hasCollectionId,
+                hasCollectionId ? collectionId : new UUID(0, 0),
+                filter.favoriteOnly(), hasReadFilter, readFilter,
+                hasTagId, hasTagId ? filter.tagId() : new UUID(0, 0),
+                hasSearch, hasSearch ? searchPattern : "",
+                hasCursor, hasCursor ? cursor.savedAt() : java.time.OffsetDateTime.now(),
                 hasCursor ? cursor.id() : new UUID(0, 0),
                 PageRequest.of(0, limit + 1)
         );
@@ -133,10 +126,7 @@ public class BookmarkService {
     }
 
     @Transactional
-    public BookmarkResponseDTO toggleFavorite(
-            Authentication authentication,
-            UUID bookmarkId
-    ) {
+    public BookmarkResponseDTO toggleFavorite(Authentication authentication, UUID bookmarkId) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
 
         BookmarkEntity bookmark = bookmarkRepository
@@ -150,10 +140,7 @@ public class BookmarkService {
     }
 
     @Transactional
-    public BookmarkResponseDTO toggleRead(
-            Authentication authentication,
-            UUID bookmarkId
-    ) {
+    public BookmarkResponseDTO toggleRead(Authentication authentication, UUID bookmarkId) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
 
         BookmarkEntity bookmark = bookmarkRepository
@@ -167,10 +154,7 @@ public class BookmarkService {
     }
 
     @Transactional
-    public void deleteBookmark(
-            Authentication authentication,
-            UUID bookmarkId
-    ) {
+    public void deleteBookmark(Authentication authentication, UUID bookmarkId) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
 
         BookmarkEntity bookmark = bookmarkRepository
@@ -181,10 +165,7 @@ public class BookmarkService {
     }
 
     @Transactional
-    public BookmarkResponseDTO createBookmark(
-            Authentication authentication,
-            CreateBookmarkRequestDTO request
-    ) {
+    public BookmarkResponseDTO createBookmark(Authentication authentication, CreateBookmarkRequestDTO request) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
 
         TweetEntity tweet = tweetRepository
@@ -211,18 +192,46 @@ public class BookmarkService {
         tweet.setUrl(request.url());
         tweet.setAuthorUsername(request.authorUsername());
         tweet.setAuthorName(request.authorName());
+        tweet.setAuthorAvatarUrl(request.authorAvatarUrl());
         tweet.setText(request.text());
         tweet.setCreatedAt(request.createdAt());
+        tweet.setReply(request.isReply());
+        tweet.setReplyToUsername(request.replyToUsername());
+        tweet.setRepostedByName(request.repostedByName());
+        tweet.setRepostedByUsername(request.repostedByUsername());
+
+        // Defensive: never link a tweet as quoting itself. This should be
+        // impossible once the extension's own dedup logic is correct, but
+        // guarding here means a future extraction bug degrades to "no quote
+        // card shown" instead of a duplicate-key 500.
+        if (request.quotedTweet() != null
+                && !request.quotedTweet().tweetId().equals(request.tweetId())) {
+            TweetEntity quoted = tweetRepository
+                    .findByTweetId(request.quotedTweet().tweetId())
+                    .orElseGet(() -> createQuotedTweet(request.quotedTweet()));
+            tweet.setQuotedTweet(quoted);
+        }
 
         return tweetRepository.save(tweet);
     }
 
+    private TweetEntity createQuotedTweet(QuotedTweetRequestDTO q) {
+        TweetEntity tweet = new TweetEntity();
+        tweet.setTweetId(q.tweetId());
+        tweet.setUrl(q.url());
+        tweet.setAuthorUsername(q.authorUsername());
+        tweet.setAuthorName(q.authorName());
+        tweet.setAuthorAvatarUrl(q.authorAvatarUrl());
+        tweet.setText(q.text());
+        tweet.setCreatedAt(q.createdAt());
+        // A quoted tweet is stored flat — we don't recurse into whatever
+        // *that* tweet might itself be quoting. One level of nesting is
+        // what the UI renders; deeper chains just show the immediate quote.
+        return tweetRepository.save(tweet);
+    }
+
     @Transactional
-    public void addBookmarkToCollection(
-            Authentication authentication,
-            UUID bookmarkId,
-            UUID collectionId
-    ) {
+    public void addBookmarkToCollection(Authentication authentication, UUID bookmarkId, UUID collectionId) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
 
         BookmarkEntity bookmark = bookmarkRepository
@@ -254,24 +263,13 @@ public class BookmarkService {
     }
 
     private BookmarkResponseDTO toResponseDTO(BookmarkEntity bookmark) {
-        TweetEntity tweet = bookmark.getTweet();
-
-        TweetResponseDTO tweetDTO = new TweetResponseDTO(
-                tweet.getId(), tweet.getUrl(), tweet.getAuthorUsername(),
-                tweet.getAuthorName(), tweet.getText(), tweet.getCreatedAt()
-        );
+        TweetResponseDTO tweetDTO = toTweetResponseDTO(bookmark.getTweet());
 
         CollectionResponseDTO collectionDTO = null;
         if (bookmark.getCollection() != null) {
             CollectionEntity c = bookmark.getCollection();
-            // bookmarkCount/unreadCount are 0 here on purpose — this is the
-            // collection object embedded inside a single bookmark's
-            // response, not the top-level /collections list, and nothing
-            // reads a count from this context. CollectionService.getCollections
-            // is the place that computes real counts.
             collectionDTO = new CollectionResponseDTO(
-                    c.getId(), c.getName(), c.getDescription(), c.getCreatedAt(), c.getUpdatedAt(),
-                    0, 0
+                    c.getId(), c.getName(), c.getDescription(), c.getCreatedAt(), c.getUpdatedAt(), 0, 0
             );
         }
 
@@ -291,6 +289,30 @@ public class BookmarkService {
         return new BookmarkResponseDTO(
                 bookmark.getId(), tweetDTO, collectionDTO, bookmark.isFavorite(),
                 bookmark.isRead(), bookmark.getSavedAt(), tagDTOs, noteDTO
+        );
+    }
+
+    // Recurses exactly once in practice — createQuotedTweet never sets a
+    // quotedTweet on the tweet it creates, so getQuotedTweet() on that
+    // result is always null and this terminates.
+    private TweetResponseDTO toTweetResponseDTO(TweetEntity tweet) {
+        TweetResponseDTO quotedDTO = tweet.getQuotedTweet() != null
+                ? toTweetResponseDTO(tweet.getQuotedTweet())
+                : null;
+
+        return new TweetResponseDTO(
+                tweet.getId(),
+                tweet.getUrl(),
+                tweet.getAuthorUsername(),
+                tweet.getAuthorName(),
+                tweet.getAuthorAvatarUrl(),
+                tweet.getText(),
+                tweet.getCreatedAt(),
+                tweet.isReply(),
+                tweet.getReplyToUsername(),
+                tweet.getRepostedByName(),
+                tweet.getRepostedByUsername(),
+                quotedDTO
         );
     }
 
@@ -329,19 +351,14 @@ public class BookmarkService {
                             note.getCreatedAt(), note.getUpdatedAt()
                     );
 
-                    TweetEntity tweet = bookmark.getTweet();
-                    TweetResponseDTO tweetDTO = new TweetResponseDTO(
-                            tweet.getId(), tweet.getUrl(), tweet.getAuthorUsername(),
-                            tweet.getAuthorName(), tweet.getText(), tweet.getCreatedAt()
-                    );
+                    TweetResponseDTO tweetDTO = toTweetResponseDTO(bookmark.getTweet());
 
                     CollectionResponseDTO collectionDTO = null;
                     if (bookmark.getCollection() != null) {
                         CollectionEntity c = bookmark.getCollection();
                         collectionDTO = new CollectionResponseDTO(
                                 c.getId(), c.getName(), c.getDescription(),
-                                c.getCreatedAt(), c.getUpdatedAt(),
-                                0, 0
+                                c.getCreatedAt(), c.getUpdatedAt(), 0, 0
                         );
                     }
 
@@ -376,5 +393,19 @@ public class BookmarkService {
     public long markAllAsRead(Authentication authentication) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
         return bookmarkRepository.markAllAsRead(user.getId());
+    }
+
+    @Transactional
+    public int bulkDelete(Authentication authentication, List<UUID> bookmarkIds) {
+        UserEntity user = (UserEntity) authentication.getPrincipal();
+        return bookmarkRepository.deleteAllByIdInAndUserId(bookmarkIds, user.getId());
+    }
+
+    @Transactional
+    public int bulkMove(Authentication authentication, List<UUID> bookmarkIds, UUID collectionId) {
+        UserEntity user = (UserEntity) authentication.getPrincipal();
+        collectionRepository.findByIdAndUser(collectionId, user)
+                .orElseThrow(() -> new ResourceNotFoundException("Collection not found"));
+        return bookmarkRepository.moveAllByIdInAndUserId(bookmarkIds, collectionId, user.getId());
     }
 }

@@ -10,6 +10,7 @@ public record BookmarkFilterRequest(
         boolean favoriteOnly,
         String search,
         String cursor,
-        Integer limit
+        Integer limit,
+        String sort
 ) {
 }

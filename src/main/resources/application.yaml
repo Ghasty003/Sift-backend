@@ -28,6 +28,9 @@ jwt:
   secret: ${JWT_SECRET:7QkLm8PxV2zNc5HrA1sDf9JyUwE4RtBx6MvZ0XcGpFnHsKaQ}
   expiration: 900000          # 15 min — access token
   refresh-expiration: 3600000 # 1hr sliding window — refresh token
+google:
+  client-id: ${GOOGLE_CLIENT_ID:575594735523-tscbll1r7cdn9qrumqg665968pauf6uu.apps.googleusercontent.com}
 
 app:
   cookie-secure: false # flip to true once served over HTTPS (staging/prod)
+  frontend-url: ${FRONTEND_URL:http://localhost:8443}

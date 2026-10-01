@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -32,7 +33,7 @@ public class BookmarkController {
         return bookmarkService.searchBookmarks(
                 authentication,
                 new BookmarkFilterRequest(
-                        collectionId, tagId, read, favoriteOnly, search, cursor, limit
+                        collectionId, tagId, read, favoriteOnly, search, cursor, limit, null
                 )
         );
     }
@@ -91,5 +92,26 @@ public class BookmarkController {
     public ResponseEntity<Map<String, Long>> markAllAsRead(Authentication authentication) {
         long updatedCount = bookmarkService.markAllAsRead(authentication);
         return ResponseEntity.ok(Map.of("updatedCount", updatedCount));
+    }
+
+    public record BulkIdsRequest(List<UUID> bookmarkIds) {}
+    public record BulkMoveRequest(List<UUID> bookmarkIds, UUID collectionId) {}
+
+    @PostMapping("/bulk-delete")
+    public ResponseEntity<Map<String, Integer>> bulkDelete(
+            Authentication authentication,
+            @RequestBody BulkIdsRequest request
+    ) {
+        int count = bookmarkService.bulkDelete(authentication, request.bookmarkIds());
+        return ResponseEntity.ok(Map.of("deletedCount", count));
+    }
+
+    @PostMapping("/bulk-move")
+    public ResponseEntity<Map<String, Integer>> bulkMove(
+            Authentication authentication,
+            @RequestBody BulkMoveRequest request
+    ) {
+        int count = bookmarkService.bulkMove(authentication, request.bookmarkIds(), request.collectionId());
+        return ResponseEntity.ok(Map.of("movedCount", count));
     }
 }
