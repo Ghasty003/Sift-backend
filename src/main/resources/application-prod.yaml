@@ -8,6 +8,10 @@ jwt:
 app:
   cookie-secure: true # required once served over HTTPS — see RefreshCookieUtil
   frontend-url: ${FRONTEND_URL}
+  cors:
+    # Exact origins only. Include the HTTPS frontend and the published
+    # chrome-extension://<extension-id> origin as a comma-separated value.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
 spring:
   mail:

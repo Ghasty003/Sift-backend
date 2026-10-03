@@ -367,15 +367,21 @@ public class BookmarkService {
     }
 
     @Transactional
-    public void addBookmarkToCollection(Authentication authentication, UUID bookmarkId, UUID collectionId) {
+    public void addBookmarkToCollection(Authentication authentication, UUID bookmarkId, String collectionId) {
         UserEntity user = (UserEntity) authentication.getPrincipal();
 
         BookmarkEntity bookmark = bookmarkRepository
                 .findByIdAndUser(bookmarkId, user)
                 .orElseThrow(() -> new ResourceNotFoundException("Bookmark not found"));
 
+        if ("inbox".equalsIgnoreCase(collectionId)) {
+            bookmark.setCollection(null);
+            bookmarkRepository.save(bookmark);
+            return;
+        }
+
         CollectionEntity collection = collectionRepository
-                .findByIdAndUser(collectionId, user)
+                .findByIdAndUser(UUID.fromString(collectionId), user)
                 .orElseThrow(() -> new ResourceNotFoundException("Collection not found"));
 
         bookmark.setCollection(collection);

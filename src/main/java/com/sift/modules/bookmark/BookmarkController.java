@@ -28,12 +28,13 @@ public class BookmarkController {
             @RequestParam(required = false, defaultValue = "false") boolean favoriteOnly,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String cursor,
-            @RequestParam(required = false) Integer limit
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) String sort
     ) {
         return bookmarkService.searchBookmarks(
                 authentication,
                 new BookmarkFilterRequest(
-                        collectionId, tagId, read, favoriteOnly, search, cursor, limit, null
+                        collectionId, tagId, read, favoriteOnly, search, cursor, limit, sort
                 )
         );
     }
@@ -75,7 +76,7 @@ public class BookmarkController {
     public ResponseEntity<Void> addBookmarkToCollection(
             Authentication authentication,
             @PathVariable UUID bookmarkId,
-            @PathVariable UUID collectionId
+            @PathVariable String collectionId
     ) {
         bookmarkService.addBookmarkToCollection(authentication, bookmarkId, collectionId);
         return ResponseEntity.noContent().build();
