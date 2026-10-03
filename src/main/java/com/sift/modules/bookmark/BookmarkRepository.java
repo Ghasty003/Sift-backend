@@ -15,7 +15,7 @@ import java.util.UUID;
 
 public interface BookmarkRepository extends JpaRepository<BookmarkEntity, UUID> {
 
-    boolean existsByUser_IdAndTweet_Id(UUID userId, UUID tweetId);
+    Optional<BookmarkEntity> findByUser_IdAndTweet_Id(UUID userId, UUID tweetId);
 
     Optional<BookmarkEntity> findByIdAndUser(UUID id, UserEntity user);
 

@@ -1,7 +1,6 @@
 package com.sift.modules.bookmark;
 
 import com.sift.common.CursorPageResponseDTO;
-import com.sift.exceptions.ConflictException;
 import com.sift.exceptions.ResourceNotFoundException;
 import com.sift.modules.collection.CollectionEntity;
 import com.sift.modules.collection.CollectionRepository;
@@ -13,6 +12,7 @@ import com.sift.modules.tag.BookmarkTagEntity;
 import com.sift.modules.tag.BookmarkTagRepository;
 import com.sift.modules.tag.TagResponseDTO;
 import com.sift.modules.tweet.TweetEntity;
+import com.sift.modules.tweet.TweetMediaEntity;
 import com.sift.modules.tweet.TweetRepository;
 import com.sift.modules.user.UserEntity;
 import org.springframework.data.domain.PageRequest;
@@ -20,8 +20,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -170,10 +173,17 @@ public class BookmarkService {
 
         TweetEntity tweet = tweetRepository
                 .findByTweetId(request.tweetId())
+                .map(existing -> enrichTweetContext(existing, request))
                 .orElseGet(() -> createTweet(request));
 
-        if (bookmarkRepository.existsByUser_IdAndTweet_Id(user.getId(), tweet.getId())) {
-            throw new ConflictException("Tweet has already been bookmarked");
+        // Saving the same X post again is intentionally idempotent. Apart
+        // from being friendlier to the extension's retry button, this lets a
+        // newer extraction repair reply/quote metadata that X omitted in
+        // another layout without destroying the bookmark's tags or note.
+        var existingBookmark = bookmarkRepository
+                .findByUser_IdAndTweet_Id(user.getId(), tweet.getId());
+        if (existingBookmark.isPresent()) {
+            return toResponseDTO(existingBookmark.get());
         }
 
         BookmarkEntity bookmark = new BookmarkEntity();
@@ -186,6 +196,51 @@ public class BookmarkService {
         return toResponseDTO(savedBookmark);
     }
 
+    private TweetEntity enrichTweetContext(
+            TweetEntity tweet,
+            CreateBookmarkRequestDTO request
+    ) {
+        boolean changed = false;
+
+        if (request.isReply() && !tweet.isReply()) {
+            tweet.setReply(true);
+            changed = true;
+        }
+
+        if (request.isReply()
+                && request.replyToUsername() != null
+                && !request.replyToUsername().isBlank()
+                && (tweet.getReplyToUsername() == null
+                || tweet.getReplyToUsername().isBlank())) {
+            tweet.setReplyToUsername(request.replyToUsername());
+            changed = true;
+        }
+
+        if (request.quotedTweet() != null
+                && !request.quotedTweet().tweetId().equals(request.tweetId())) {
+            TweetEntity quoted = tweet.getQuotedTweet();
+
+            if (quoted == null) {
+                quoted = tweetRepository
+                        .findByTweetId(request.quotedTweet().tweetId())
+                        .orElseGet(() -> createQuotedTweet(request.quotedTweet()));
+                tweet.setQuotedTweet(quoted);
+                changed = true;
+            }
+
+            if (synchronizeMedia(quoted, request.quotedTweet().media())) {
+                tweetRepository.save(quoted);
+                changed = true;
+            }
+        }
+
+        if (request.media() != null && !request.media().isEmpty()) {
+            changed = synchronizeMedia(tweet, request.media()) || changed;
+        }
+
+        return changed ? tweetRepository.save(tweet) : tweet;
+    }
+
     private TweetEntity createTweet(CreateBookmarkRequestDTO request) {
         TweetEntity tweet = new TweetEntity();
         tweet.setTweetId(request.tweetId());
@@ -195,6 +250,7 @@ public class BookmarkService {
         tweet.setAuthorAvatarUrl(request.authorAvatarUrl());
         tweet.setText(request.text());
         tweet.setCreatedAt(request.createdAt());
+        synchronizeMedia(tweet, request.media());
         tweet.setReply(request.isReply());
         tweet.setReplyToUsername(request.replyToUsername());
         tweet.setRepostedByName(request.repostedByName());
@@ -224,10 +280,90 @@ public class BookmarkService {
         tweet.setAuthorAvatarUrl(q.authorAvatarUrl());
         tweet.setText(q.text());
         tweet.setCreatedAt(q.createdAt());
+        synchronizeMedia(tweet, q.media());
         // A quoted tweet is stored flat — we don't recurse into whatever
         // *that* tweet might itself be quoting. One level of nesting is
         // what the UI renders; deeper chains just show the immediate quote.
         return tweetRepository.save(tweet);
+    }
+
+    private boolean synchronizeMedia(
+            TweetEntity tweet,
+            List<TweetMediaRequestDTO> mediaItems
+    ) {
+        List<TweetMediaRequestDTO> normalized = normalizeMedia(mediaItems);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+
+        List<TweetMediaEntity> existing = tweet.getMedia();
+        boolean changed = existing.size() != normalized.size();
+        int sharedSize = Math.min(existing.size(), normalized.size());
+
+        for (int i = 0; i < sharedSize; i++) {
+            TweetMediaEntity entity = existing.get(i);
+            TweetMediaRequestDTO request = normalized.get(i);
+
+            if (!entity.getMediaType().equals(request.type())
+                    || !entity.getPreviewUrl().equals(request.previewUrl())
+                    || entity.getPosition() != i) {
+                entity.setMediaType(request.type());
+                entity.setPreviewUrl(request.previewUrl());
+                entity.setPosition(i);
+                changed = true;
+            }
+        }
+
+        while (existing.size() > normalized.size()) {
+            existing.remove(existing.size() - 1);
+        }
+
+        for (int i = existing.size(); i < normalized.size(); i++) {
+            TweetMediaRequestDTO request = normalized.get(i);
+            TweetMediaEntity entity = new TweetMediaEntity();
+            entity.setMediaType(request.type());
+            entity.setPreviewUrl(request.previewUrl());
+            entity.setPosition(i);
+            tweet.addMedia(entity);
+        }
+
+        return changed;
+    }
+
+    private List<TweetMediaRequestDTO> normalizeMedia(
+            List<TweetMediaRequestDTO> mediaItems
+    ) {
+        if (mediaItems == null || mediaItems.isEmpty()) {
+            return List.of();
+        }
+
+        List<TweetMediaRequestDTO> normalized = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+
+        for (TweetMediaRequestDTO request : mediaItems) {
+            if (request == null
+                    || request.previewUrl() == null
+                    || request.previewUrl().isBlank()) {
+                continue;
+            }
+
+            String type = "VIDEO".equalsIgnoreCase(request.type())
+                    ? "VIDEO"
+                    : "IMAGE";
+            String previewUrl = request.previewUrl().trim();
+
+            if (seen.add(type + "|" + previewUrl)) {
+                normalized.add(new TweetMediaRequestDTO(type, previewUrl));
+            }
+
+            // X displays at most four media tiles on a post. Capping here
+            // also protects the API from unbounded request payloads.
+            if (normalized.size() == 4) {
+                break;
+            }
+        }
+
+        return normalized;
     }
 
     @Transactional
@@ -308,6 +444,12 @@ public class BookmarkService {
                 tweet.getAuthorAvatarUrl(),
                 tweet.getText(),
                 tweet.getCreatedAt(),
+                tweet.getMedia().stream()
+                        .map(media -> new TweetMediaResponseDTO(
+                                media.getMediaType(),
+                                media.getPreviewUrl()
+                        ))
+                        .toList(),
                 tweet.isReply(),
                 tweet.getReplyToUsername(),
                 tweet.getRepostedByName(),

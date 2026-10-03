@@ -3,6 +3,8 @@ package com.sift.modules.tweet;
 import jakarta.persistence.*;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -62,10 +64,24 @@ public class TweetEntity {
     @Column(name = "reposted_by_username")
     private String repostedByUsername;
 
+    @OneToMany(
+            mappedBy = "tweet",
+            cascade = CascadeType.ALL,
+            orphanRemoval = true,
+            fetch = FetchType.LAZY
+    )
+    @OrderBy("position ASC")
+    private List<TweetMediaEntity> media = new ArrayList<>();
+
     public String getRepostedByName() { return repostedByName; }
     public void setRepostedByName(String repostedByName) { this.repostedByName = repostedByName; }
     public String getRepostedByUsername() { return repostedByUsername; }
     public void setRepostedByUsername(String repostedByUsername) { this.repostedByUsername = repostedByUsername; }
+    public List<TweetMediaEntity> getMedia() { return media; }
+    public void addMedia(TweetMediaEntity item) {
+        item.setTweet(this);
+        media.add(item);
+    }
 
     public UUID getId() { return id; }
     public String getTweetId() { return tweetId; }

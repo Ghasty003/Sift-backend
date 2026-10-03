@@ -1,6 +1,7 @@
 package com.sift.modules.bookmark;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record TweetResponseDTO(
@@ -11,6 +12,7 @@ public record TweetResponseDTO(
         String authorAvatarUrl,
         String text,
         OffsetDateTime createdAt,
+        List<TweetMediaResponseDTO> media,
         boolean isReply,
         String replyToUsername,
         String repostedByName,
